@@ -137,6 +137,24 @@ public:
 		return pData;
 	}
 
+	BYTE* audioRecordReturn() // Do in cycle, can be sent by tcp client, put WAVHeader as &(link) in second argument, then make file.seekp(0) and file.write(reinterpret_cast<const char*>(yourHeader), sizeof(yourHeader);
+	{
+		BYTE* pData = nullptr;
+		UINT32 frames = 0;
+		UINT32 bytes = 0;
+		DWORD flags = 0;
+
+		do
+		{
+			HRESULT hr = pCapture->GetBuffer(&pData, &frames, &flags, nullptr, nullptr);
+
+			bytes = frames * pwfx->nBlockAlign;
+
+			pCapture->ReleaseBuffer(frames);
+		} while (FAILED(hr));
+		return pData;
+	}
+
 	void shutdownAudio()
 	{
 		SAFE_RELEASE(pAudioClient);

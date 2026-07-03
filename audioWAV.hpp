@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <algorithm>
+#pragma comment(lib, "ole32.lib")
 
 #define SAFE_RELEASE(punk) \
     if ((punk) != nullptr) \

@@ -13,6 +13,27 @@
         (punk) = nullptr;  \
     }
 
+struct WAVHeader
+{
+	char riff[4] = { 'R','I','F','F' };
+	uint32_t fileSize;
+
+	char wave[4] = { 'W','A','V','E' };
+
+	char fmt[4] = { 'f','m','t',' ' };
+	uint32_t fmtSize = 16;
+
+	uint16_t audioFormat = 3;
+	uint16_t channels;
+	uint32_t sampleRate;
+	uint32_t byteRate;
+	uint16_t blockAlign;
+	uint16_t bitsPerSample;
+
+	char data[4] = { 'd','a','t','a' };
+	uint32_t dataSize;
+};
+
 class AudioRecorder
 {
 private:
@@ -252,25 +273,4 @@ public:
 	{
 		pAudioClient->Stop();
 	}
-};
-
-struct WAVHeader
-{
-	char riff[4] = { 'R','I','F','F' };
-	uint32_t fileSize;
-
-	char wave[4] = { 'W','A','V','E' };
-
-	char fmt[4] = { 'f','m','t',' ' };
-	uint32_t fmtSize = 16;
-
-	uint16_t audioFormat = 3;
-	uint16_t channels;
-	uint32_t sampleRate;
-	uint32_t byteRate;
-	uint16_t blockAlign;
-	uint16_t bitsPerSample;
-
-	char data[4] = { 'd','a','t','a' };
-	uint32_t dataSize;
 };

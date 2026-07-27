@@ -42,78 +42,7 @@ public:
 
 	}
 
-	int recordSoundInWAVFile(const char path, const char filename, bool whenStop) // Run as async function, put in argument link to bool variable
-	{
-		WAVHeader header;
-		std::ofstream file{ std::ofstream(path + (filename + ".wav"), std::ios::binary)};
-
-		header.audioFormat = 3;
-		header.channels = pwfx->nChannels;
-		header.sampleRate = pwfx->nSamplesPerSec;
-		header.bitsPerSample = pwfx->wBitsPerSample;
-		header.blockAlign = pwfx->nBlockAlign;
-		header.byteRate = pwfx->nAvgBytesPerSec;
-
-		header.dataSize = 0;
-		header.fileSize = 36;
-
-		file.write(reinterpret_cast<const char*>(&header), sizeof(header));
-
-		pAudioClient->Start();
-
-		while (whenStop)
-		{ 
-			UINT32 packetLenght{ 0 };
-			pCapture->GetNextPacketSize(&packetLenght);
-
-			if (packetLenght == 0)
-			{
-				Sleep(5);
-				continue;
-			}
-
-			while (packetLenght > 0)
-			{
-				BYTE* pData = nullptr;
-				UINT32 frames = 0;
-				UINT32 bytes = 0;
-				DWORD flags = 0;
-
-				HRESULT hr = pCapture->GetBuffer(&pData, &frames, &flags, nullptr, nullptr);
-
-				if (FAILED(hr))
-				{
-					continue;
-				}
-
-				bytes = frames * pwfx->nBlockAlign;
-				
-				file.write(reinterpret_cast<const char*>(pData), bytes);
-
-				header.dataSize += bytes;
-				pCapture->ReleaseBuffer(frames);
-			}
-
-			file.seekp(0);
-
-			file.write(reinterpret_cast<const char*>(&header), sizeof(header));
-		}
-
-		return 0;
-	}
-
-	void initializeHeaderBeforeReturnRecord(WAVHeader headerInit)  // put as a link, initialization for header before audioRecordReturn
-	{
-		headerInit.audioFormat = pwfx->wFormatTag;
-		headerInit.channels = pwfx->nChannels;
-		headerInit.sampleRate = pwfx->nSamplesPerSec;
-		headerInit.bitsPerSample = pwfx->wBitsPerSample;
-		headerInit.blockAlign = pwfx->nBlockAlign;
-		headerInit.byteRate = pwfx->nAvgBytesPerSec;
-
-		headerInit.dataSize = 0;
-		headerInit.fileSize = 36;
-	}
+	
 
 	BYTE* audioRecordReturn() // Do in cycle, can be sent by tcp client, call releasePData() after every use
 	{
@@ -121,7 +50,7 @@ public:
 		DWORD flags = 0;
 		UINT32 packetLenght{ 0 };
 
-		packetSize:
+	packetSize:
 		pCapture->GetNextPacketSize(&packetLenght);
 
 		if (packetLenght == 0)
@@ -138,34 +67,7 @@ public:
 
 	void releasePData() { pCapture->ReleaseBuffer(frames); }
 
-	BYTE* audioRecordReturn(WAVHeader headerArg) // Do in cycle, can be sent by tcp client, put WAVHeader as &(link) in second argument, then make file.seekp(0) and file.write(reinterpret_cast<const char*>(yourHeader), sizeof(yourHeader);
-	{
-		BYTE* pData = nullptr;
-		UINT32 frames = 0;
-		UINT32 bytes = 0;
-		DWORD flags = 0;
-		UINT32 packetLenght{ 0 };
-
-	packetSize:
-		pCapture->GetNextPacketSize(&packetLenght);
-
-		if (packetLenght == 0)
-		{
-			Sleep(5);
-			goto packetSize;
-		}
-
-		do
-		{
-			HRESULT hr = pCapture->GetBuffer(&pData, &frames, &flags, nullptr, nullptr);
-
-			bytes = frames * pwfx->nBlockAlign;
-
-			headerArg.dataSize += bytes;
-			pCapture->ReleaseBuffer(frames);
-		} while (FAILED(hr));
-		return pData;
-	}
+	
 
 	void shutdownAudio()
 	{
@@ -190,7 +92,6 @@ private:
 public:
 	int audioInitToPlay()
 	{
-		pwfx->wFormatTag = 3;
 		HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 		if (FAILED(hr)) return -1;
 
@@ -217,8 +118,8 @@ public:
 		pAudioClient->Start();
 	}
 
-	int audioPlayer(BYTE* PCMData, size_t size)
-	{
+	int audioPlayer(BYTE PCMData[], size_t size)
+	{ 
 		bool fullPlayed = false;
 
 		UINT32 padding;
@@ -238,15 +139,18 @@ public:
 		if (size < freeBytes)
 		{
 			memcpy(pData, PCMData, size);
-			pRenderClient->ReleaseBuffer(size, NULL);
+			pRenderClient->ReleaseBuffer(size / pwfx->nBlockAlign, NULL);
 			return 0;
 		}
-
+			
 		while (bytesCopied < size)
 		{
 			pAudioClient->GetCurrentPadding(&padding);
 			UINT32 freeFrames = bufferFrames - padding;
 			UINT32 freeBytes = freeFrames * pwfx->nBlockAlign;
+
+			hr = pRenderClient->GetBuffer(freeFrames, &pData);
+			std::cout << hr << std::endl;
 
 			if (freeFrames == 0)
 			{
@@ -254,9 +158,16 @@ public:
 				continue;
 			}
 
-			memcpy(pData, PCMData + bytesCopied, freeBytes);
+			if (size - bytesCopied < freeBytes)
+			{
+				memcpy(pData, PCMData + (size - bytesCopied), freeBytes);
+				pRenderClient->ReleaseBuffer(freeFrames, NULL);
+				break;
+			}
+
+			memcpy(pData, PCMData + bytesCopied, freeBytes); // тут исключение
 			bytesCopied += freeBytes;
-			pRenderClient->ReleaseBuffer(size, NULL);
+			pRenderClient->ReleaseBuffer(freeFrames, NULL);
 		}
 		return 0;
 	}
